@@ -1,17 +1,19 @@
-const CACHE_NAME = 'hora-hora-v12';
-const urlsToCache = [
+const CACHE_NAME = 'hora-hora-v13';
+const assetsToCache = [
     './',
     './index.html',
     './manifest.json',
-    'https://cdn.tailwindcss.com',
-    'https://cdn.jsdelivr.net/npm/chart.js',
-    'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js'
+    './icon.png'
 ];
 
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then(cache => cache.addAll(urlsToCache))
+            .then(cache => {
+                return cache.addAll(assetsToCache).catch(err => {
+                    console.log('Erro ao adicionar assets ao cache:', err);
+                });
+            })
             .then(() => self.skipWaiting())
     );
 });
@@ -37,7 +39,12 @@ self.addEventListener('fetch', event => {
                 if (response) {
                     return response;
                 }
-                return fetch(event.request).catch(() => {
+                return fetch(event.request).then(networkResponse => {
+                    return caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, networkResponse.clone());
+                        return networkResponse;
+                    });
+                }).catch(() => {
                     return caches.match('./index.html');
                 });
             })
