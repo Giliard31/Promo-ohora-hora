@@ -60,6 +60,22 @@
         </div>
     </div>
 
+    <!-- MODAL EDITAR HORÁRIOS DO TURNO -->
+    <div id="modal-editar-horarios" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="text-sm font-bold text-slate-900 uppercase">Editar Horas do Turno</h3>
+                <button onclick="fecharModalEditarHorarios()" class="text-slate-400 hover:text-slate-700 text-xs font-bold">✕ Fechar</button>
+            </div>
+            <p class="text-xs text-slate-500">Modifique os horários da sua linha (ex: digite <b>ALMOÇO</b> em uma das horas):</p>
+            <div id="lista-inputs-horarios" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+            <div class="flex gap-2 pt-2 border-t">
+                <button onclick="fecharModalEditarHorarios()" class="w-1/2 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Cancelar</button>
+                <button onclick="salvarHorariosEditados()" class="w-1/2 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition">Salvar Horários</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MENU GAVETA LATERAL -->
     <div id="drawer-backdrop" onclick="toggleGaveta(false)" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 hidden transition-opacity"></div>
     
@@ -463,13 +479,92 @@
             });
         }
 
+        function toggleMenuTurno(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('menu-dropdown-turno');
+            menu.classList.toggle('hidden');
+        }
+
+        // Fechar menu ao clicar fora
+        window.addEventListener('click', () => {
+            const menu = document.getElementById('menu-dropdown-turno');
+            if (menu && !menu.classList.contains('hidden')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        function abrirModalEditarHorarios() {
+            document.getElementById('menu-dropdown-turno').classList.add('hidden');
+            const container = document.getElementById('lista-inputs-horarios');
+            container.innerHTML = '';
+            estado.linhas.forEach((l, idx) => {
+                container.innerHTML += `
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-600 w-16">Hora ${idx + 1}:</span>
+                        <input type="text" id="input-hora-edit-${idx}" value="${l.hora}" class="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    </div>
+                `;
+            });
+            document.getElementById('modal-editar-horarios').classList.remove('hidden');
+        }
+
+        function fecharModalEditarHorarios() {
+            document.getElementById('modal-editar-horarios').classList.add('hidden');
+        }
+
+        function salvarHorariosEditados() {
+            estado.linhas.forEach((l, idx) => {
+                const input = document.getElementById(`input-hora-edit-${idx}`);
+                if (input) {
+                    l.hora = input.value.trim();
+                }
+            });
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            fecharModalEditarHorarios();
+            recalcularTudo(false, true);
+        }
+
+        function adicionarHoraTurno() {
+            document.getElementById('menu-dropdown-turno').classList.add('hidden');
+            
+            estado.linhas.push({
+                hora: 'NOVA',
+                registros: Array(estado.qtdMaquinas).fill(null)
+            });
+
+            let tempoAtual = parseFloat(document.getElementById('ef-tempo-turno').value) || 440;
+            let novoTempo = tempoAtual + 55;
+            document.getElementById('ef-tempo-turno').value = novoTempo;
+            estado.moAjustes.tempoTurno = novoTempo;
+
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            recalcularTudo(false, true);
+            abrirModalEditarHorarios();
+        }
+
+        function removerHoraTurno() {
+            document.getElementById('menu-dropdown-turno').classList.add('hidden');
+            if (estado.linhas.length <= 1) {
+                return mostrarAviso('O turno precisa ter pelo menos um horário.');
+            }
+            estado.linhas.pop();
+
+            let tempoAtual = parseFloat(document.getElementById('ef-tempo-turno').value) || 440;
+            let novoTempo = Math.max(55, tempoAtual - 55);
+            document.getElementById('ef-tempo-turno').value = novoTempo;
+            estado.moAjustes.tempoTurno = novoTempo;
+
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            recalcularTudo(false, true);
+        }
+
         function mostrarAviso(msg) {
             document.getElementById('modal-aviso-texto').innerText = msg;
             document.getElementById('modal-aviso').classList.remove('hidden');
         }
 
         let bancoTempos = JSON.parse(localStorage.getItem('app_tempos_db')) || {};
-        const HORARIOS_PADRAO = ['06:00', '07:10', '08:10', '09:10', '11:20', '12:20', '13:20'];
+        const HORARIOS_PADRAO = ['05:00', '06:00', '07:10', '08:10', '09:10', '11:20', '12:20', '13:20'];
 
         let estado = JSON.parse(localStorage.getItem('app_estado_v12')) || {
             linha: 'LINHA - 06',
@@ -614,7 +709,6 @@
                 estado.linhas[linhaIdx].registros[maqIdx] = isNaN(valNum) ? null : valNum;
                 recalcularTudo(false, true);
 
-                // Pular automaticamente para o próximo campo (próxima máquina da mesma hora, ou próxima hora)
                 let proxLinha = linhaIdx;
                 let proxMaq = maqIdx + 1;
                 if (proxMaq >= estado.qtdMaquinas) {
@@ -627,6 +721,11 @@
                     proxInput.select();
                 }
             }
+        }
+
+        function atualizarHoraLinha(linhaIdx, novaHora) {
+            estado.linhas[linhaIdx].hora = novaHora;
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
         }
 
         function atualizarRegistro(linhaIdx, maqIdx, valStr) {
@@ -666,9 +765,9 @@
                 estado.metaManual = parseFloat(document.getElementById('cfg-meta').value) || 1008;
             }
 
-            const qtdHorarios = estado.linhas.length || 7;
+            const qtdHorarios = estado.linhas.filter(l => !(l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO'))).length || 7;
             if (!metaMaqEditadaManualmente) {
-                const metaLinhaCalc = Math.round(estado.metaManual / qtdHorarios);
+                const metaLinhaCalc = Math.round(estado.metaManual / (qtdHorarios || 1));
                 const metaPorMaqCalc = Math.ceil(metaLinhaCalc / (estado.qtdMaquinas || 1));
                 estado.metaHoraLinha = metaLinhaCalc;
                 estado.metaHoraMaq = metaPorMaqCalc;
@@ -716,7 +815,7 @@
             const minDisponiveis = pessoasAtivas * estado.moAjustes.tempoTurno;
             const eficienciaProl = minDisponiveis > 0 ? (minutosExecutadosTotal / minDisponiveis) * 100 : 0;
             const eficiencia435 = (pessoasAtivas * 435) > 0 ? (minutosExecutadosTotal / (pessoasAtivas * 435)) * 100 : 0;
-            const absenteísmo = pessoasAtivas > 0 ? (estado.moAjustes.faltas / pessoasAtivas) * 100 : 0;
+            const absenteismo = pessoasAtivas > 0 ? (estado.moAjustes.faltas / pessoasAtivas) * 100 : 0;
 
             document.getElementById('ef-mo-base').innerText = estado.mobra;
             document.getElementById('cfg-mobra').value = estado.mobra;
@@ -726,7 +825,7 @@
             document.getElementById('ef-card-prol').innerText = eficienciaProl.toFixed(1) + '%';
             document.getElementById('ef-card-435').innerText = eficiencia435.toFixed(1) + '%';
             document.getElementById('ef-card-mindisp').innerText = minDisponiveis.toLocaleString('pt-BR');
-            document.getElementById('ef-card-abs').innerText = absenteísmo.toFixed(1) + '%';
+            document.getElementById('ef-card-abs').innerText = absenteismo.toFixed(1) + '%';
 
             const msgEf = document.getElementById('ef-mensagem-status');
             if (eficienciaProl >= 79) {
@@ -747,7 +846,6 @@
         function renderizarTabelaHoraHora(eficienciaProl, pessoasAtivas) {
             const qMaq = estado.qtdMaquinas;
             
-            // Linha 1 do Cabeçalho: Identificação clara Maq 1, Maq 2... + Divisor + Nomes dos 2 Operadores da Máquina
             let htmlDiv = `<th class="p-3 border-r border-slate-700 text-left sticky-col-hora bg-slate-900 sticky-shadow min-w-[74px] text-base font-black">HORA</th>`;
             for (let m = 0; m < qMaq; m++) {
                 const ops = estado.operadoresMaquinas[m + 1] || { op1: '', op2: '' };
@@ -783,8 +881,23 @@
             `;
             document.getElementById('header-divisores').innerHTML = htmlDiv;
 
-            // Linha 2 do Cabeçalho: Campos mais largos na horizontal
-            let htmlCol = `<th class="p-2 border-r border-slate-300 text-left sticky-col-hora bg-slate-200 sticky-shadow min-w-[74px]">TURNO</th>`;
+            let htmlCol = `<th class="p-2 border-r border-slate-300 text-left sticky-col-hora bg-slate-200 sticky-shadow min-w-[74px] relative">
+                        <button onclick="toggleMenuTurno(event)" class="w-full flex items-center justify-between font-bold text-slate-800 hover:text-blue-600 focus:outline-none">
+                            <span>TURNO</span>
+                            <span class="text-xs">▾</span>
+                        </button>
+                        <div id="menu-dropdown-turno" class="hidden absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 py-1.5 text-xs font-semibold text-slate-700">
+                            <button onclick="abrirModalEditarHorarios()" class="w-full text-left px-4 py-2 hover:bg-slate-100 flex items-center gap-2">
+                                <span>✏️</span> Editar Horas
+                            </button>
+                            <button onclick="adicionarHoraTurno()" class="w-full text-left px-4 py-2 hover:bg-slate-100 flex items-center gap-2 text-emerald-700 font-bold border-t border-slate-100">
+                                <span>➕</span> Acrescentar Hora
+                            </button>
+                            <button onclick="removerHoraTurno()" class="w-full text-left px-4 py-2 hover:bg-slate-100 flex items-center gap-2 text-red-600 border-t border-slate-100">
+                                <span>➖</span> Diminuir Hora
+                            </button>
+                        </div>
+                    </th>`;
             for (let m = 0; m < qMaq; m++) {
                 htmlCol += `
                     <th class="p-2 border-r border-slate-300 text-center bg-slate-100 text-slate-700 min-w-[115px]">REGISTRO</th>
@@ -803,47 +916,62 @@
             let saldoAcumulado = 0;
 
             estado.linhas.forEach((linha, lIdx) => {
+                const isAlmoco = linha.hora.toUpperCase().includes('ALMOÇO') || linha.hora.toUpperCase().includes('ALMOCO');
                 let somaLinha = 0;
                 let temAlgum = false;
-                let rowHtml = `<td class="p-2.5 border-r border-slate-300 font-black text-slate-900 bg-slate-100 sticky-col-hora sticky-shadow min-w-[74px]">${linha.hora}</td>`;
+                let rowHtml = `<td class="p-2 border-r border-slate-300 ${isAlmoco ? 'bg-slate-300' : 'bg-slate-100'} sticky-col-hora sticky-shadow min-w-[85px] text-center"><input type="text" value="${linha.hora}" onchange="atualizarHoraLinha(${lIdx}, this.value)" class="w-full bg-transparent text-center font-black ${isAlmoco ? 'text-amber-800' : 'text-slate-900'} text-base sm:text-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-1"></td>`;
 
-                for (let m = 0; m < qMaq; m++) {
-                    const reg = linha.registros[m];
-                    const temReg = reg !== null && reg !== undefined && reg !== '';
-                    const div = estado.divisores[m] || 1;
-                    const real = temReg ? (reg / div) : 0;
+                if (isAlmoco) {
+                    for (let m = 0; m < qMaq; m++) {
+                        rowHtml += `
+                            <td colspan="2" class="p-2 border-r-2 border-slate-300 text-center bg-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider">
+                                🍽️ INTERVALO DE ALMOÇO
+                            </td>
+                        `;
+                    }
+                    rowHtml += `
+                        <td class="p-2.5 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-200">-</td>
+                        <td class="p-2.5 text-center text-xs text-slate-500 bg-slate-200">-</td>
+                    `;
+                } else {
+                    for (let m = 0; m < qMaq; m++) {
+                        const reg = linha.registros[m];
+                        const temReg = reg !== null && reg !== undefined && reg !== '';
+                        const div = estado.divisores[m] || 1;
+                        const real = temReg ? (reg / div) : 0;
 
-                    if (temReg) {
-                        temAlgum = true;
-                        somaMaqReal[m] += real;
-                        somaMaqBruta[m] += reg;
-                        somaLinha += real;
+                        if (temReg) {
+                            temAlgum = true;
+                            somaMaqReal[m] += real;
+                            somaMaqBruta[m] += reg;
+                            somaLinha += real;
+                        }
+
+                        const corSem = obterClasseSemaforo(real, temReg);
+                        rowHtml += `
+                            <td class="p-1.5 border-r border-slate-200 text-center min-w-[115px]">
+                                <input type="number" inputmode="numeric" data-linha="${lIdx}" data-maq="${m}" value="${temReg ? reg : ''}" placeholder="0"
+                                       oninput="aoDigitarRegistro(this, ${lIdx}, ${m})"
+                                       onchange="atualizarRegistro(${lIdx}, ${m}, this.value)"
+                                       class="input-registro-hora w-full text-center py-2 px-2 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none font-bold text-slate-900 bg-white text-base font-black">
+                            </td>
+                            <td class="p-2 border-r-2 border-slate-300 text-center text-base font-black min-w-[90px] ${corSem}">
+                                ${temReg ? (Number.isInteger(real) ? real : real.toFixed(1)) : '-'}
+                            </td>
+                        `;
                     }
 
-                    const corSem = obterClasseSemaforo(real, temReg);
+                    totalRealizado += somaLinha;
+                    const dif = temAlgum ? (somaLinha - estado.metaHoraLinha) : 0;
+                    if (temAlgum) saldoAcumulado += dif;
+
                     rowHtml += `
-                        <td class="p-1.5 border-r border-slate-200 text-center min-w-[115px]">
-                            <input type="number" inputmode="numeric" data-linha="${lIdx}" data-maq="${m}" value="${temReg ? reg : ''}" placeholder="0"
-                                   oninput="aoDigitarRegistro(this, ${lIdx}, ${m})"
-                                   onchange="atualizarRegistro(${lIdx}, ${m}, this.value)"
-                                   class="input-registro-hora w-full text-center py-2 px-2 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none font-bold text-slate-900 bg-white text-base font-black">
-                        </td>
-                        <td class="p-2 border-r-2 border-slate-300 text-center text-sm font-black min-w-[90px] ${corSem}">
-                            ${temReg ? (Number.isInteger(real) ? real : real.toFixed(1)) : '-'}
+                        <td class="p-2.5 border-r border-slate-200 text-center font-bold text-blue-700 bg-blue-50/50 text-base font-black">${temAlgum ? somaLinha : '-'}</td>
+                        <td class="p-2.5 text-center text-xs ${!temAlgum ? 'text-slate-400' : (dif >= 0 ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold')}">
+                            ${temAlgum ? (dif > 0 ? '+' + dif : dif) : '-'}
                         </td>
                     `;
                 }
-
-                totalRealizado += somaLinha;
-                const dif = temAlgum ? (somaLinha - estado.metaHoraLinha) : 0;
-                if (temAlgum) saldoAcumulado += dif;
-
-                rowHtml += `
-                    <td class="p-2.5 border-r border-slate-200 text-center font-bold text-blue-700 bg-blue-50/50 text-base font-black">${temAlgum ? somaLinha : '-'}</td>
-                    <td class="p-2.5 text-center text-xs ${!temAlgum ? 'text-slate-400' : (dif >= 0 ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold')}">
-                        ${temAlgum ? (dif > 0 ? '+' + dif : dif) : '-'}
-                    </td>
-                `;
                 tbody.innerHTML += `<tr class="hover:bg-slate-50/80 transition">${rowHtml}</tr>`;
             });
 
@@ -992,6 +1120,7 @@
 
             if (filtroMaq === 'todas') {
                 datasetProducao = estado.linhas.map(l => {
+                    if (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) return 0;
                     let soma = 0;
                     for (let m = 0; m < estado.qtdMaquinas; m++) {
                         const reg = l.registros[m];
@@ -1001,17 +1130,18 @@
                     }
                     return soma;
                 });
-                datasetMeta = estado.linhas.map(() => estado.metaHoraLinha);
+                datasetMeta = estado.linhas.map(l => (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) ? 0 : estado.metaHoraLinha);
             } else {
                 const mIdx = parseInt(filtroMaq) - 1;
                 datasetProducao = estado.linhas.map(l => {
+                    if (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) return 0;
                     const reg = l.registros[mIdx];
                     if (reg !== null && reg !== undefined && reg !== '') {
                         return reg / (estado.divisores[mIdx] || 1);
                     }
                     return 0;
                 });
-                datasetMeta = estado.linhas.map(() => estado.metaHoraMaq);
+                datasetMeta = estado.linhas.map(l => (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) ? 0 : estado.metaHoraMaq);
             }
 
             const opsInfo = filtroMaq !== 'todas' ? estado.operadoresMaquinas[filtroMaq] : null;
@@ -1119,6 +1249,7 @@
 
             let totalReal = 0, saldo = 0;
             estado.linhas.forEach(l => {
+                if (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) return;
                 let s = 0, tem = false;
                 for (let m = 0; m < estado.qtdMaquinas; m++) {
                     if (l.registros[m] !== null && l.registros[m] !== undefined) {
