@@ -8,14 +8,57 @@
     <meta name="theme-color" content="#0f172a">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
         .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        
+        /* Coluna da Hora travada na esquerda ao rolar horizontalmente */
+        .sticky-col-hora {
+            position: sticky;
+            left: 0;
+            z-index: 20;
+        }
+        thead .sticky-col-hora {
+            z-index: 30;
+        }
+        tfoot .sticky-col-hora {
+            z-index: 25;
+        }
+        .sticky-shadow {
+            box-shadow: 3px 0 6px -2px rgba(0, 0, 0, 0.15);
+        }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans overflow-x-hidden text-sm">
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col font-sans overflow-x-hidden text-base font-black">
+
+    <!-- MODAL COMEMORAÇÃO META BATIDA -->
+    <div id="modal-meta-batida" class="fixed inset-0 bg-slate-950/75 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border-4 border-emerald-500 transform scale-100 space-y-4">
+            <div class="text-5xl animate-bounce">🏆🎉</div>
+            <h2 class="text-2xl sm:text-3xl font-black text-emerald-600 tracking-wide uppercase">META BATIDA!</h2>
+            <p class="text-sm font-semibold text-slate-700">Parabéns a toda a equipe! O objetivo do dia foi alcançado com sucesso!</p>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <span class="text-xs font-bold text-emerald-800 uppercase block">Produção Total</span>
+                <span id="modal-meta-valor" class="text-2xl font-black text-emerald-700">0 pares</span>
+            </div>
+            <button onclick="fecharModalMetaBatida()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm shadow-lg transition">
+                Continuar 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL NOTIFICAÇÃO GERAL -->
+    <div id="modal-aviso" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-xs w-full p-5 text-center shadow-xl border border-slate-200 space-y-3">
+            <p id="modal-aviso-texto" class="text-sm font-bold text-slate-800"></p>
+            <button onclick="document.getElementById('modal-aviso').classList.add('hidden')" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg text-xs transition">
+                OK
+            </button>
+        </div>
+    </div>
 
     <!-- MENU GAVETA LATERAL -->
     <div id="drawer-backdrop" onclick="toggleGaveta(false)" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-50 hidden transition-opacity"></div>
@@ -101,7 +144,7 @@
         <div class="max-w-[1440px] mx-auto px-4 py-2.5 flex justify-between items-center gap-3">
             <div class="flex items-center gap-3 min-w-0">
                 <button onclick="toggleGaveta(true)" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-bold transition shrink-0 border border-slate-700">
-                    <span class="text-sm">☰</span>
+                    <span class="text-base font-black">☰</span>
                     <span>Menu</span>
                 </button>
                 <div class="min-w-0">
@@ -119,71 +162,12 @@
         </div>
     </header>
 
-    <!-- ABA 1: QUADRO HORA-HORA -->
-    <main id="aba-horahora" class="flex-grow max-w-[1440px] mx-auto p-3 sm:p-4 w-full space-y-3">
-        <div id="painel-recolhivel-completo" class="space-y-3 transition-all">
-            <section class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase">Linha / Líder</label>
-                    <input type="text" id="cfg-linha" value="LINHA - 06" onchange="recalcularTudo()" class="w-full mt-1 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-semibold text-xs">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase">M. Obra (Sinc.)</label>
-                    <input type="number" id="cfg-mobra" value="13" min="1" oninput="sincronizarMobraMain()" class="w-full mt-1 px-2.5 py-1.5 bg-emerald-50 border border-emerald-300 rounded-lg font-bold text-sm text-center text-emerald-900">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-emerald-700 uppercase">Qtd. Máquinas</label>
-                    <input type="number" id="cfg-qmaq" value="4" min="1" max="20" oninput="ajustarQtdMaquinas(this.value)" class="w-full mt-1 px-2.5 py-1.5 bg-emerald-50 border border-emerald-400 rounded-lg font-bold text-sm text-center text-emerald-900">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-amber-700 uppercase">Meta / Hora (Máq.)</label>
-                    <input type="number" id="cfg-mhora" value="36" oninput="recalcularTudo(false, true)" class="w-full mt-1 px-2.5 py-1.5 bg-amber-50 border border-amber-300 rounded-lg font-bold text-sm text-center text-amber-900">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-500 uppercase">Meta Hora-Hora Linha</label>
-                    <input type="number" id="cfg-metahoralinha" value="144" oninput="recalcularTudo(false, true)" class="w-full mt-1 px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg font-bold text-sm text-center text-slate-800">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-blue-700 uppercase">Meta Total</label>
-                    <input type="number" id="cfg-meta" value="1008" oninput="recalcularTudo(true, false)" class="w-full mt-1 px-2.5 py-1.5 bg-blue-50 border border-blue-300 rounded-lg font-bold text-sm text-center text-blue-800">
-                </div>
-            </section>
-
-            <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200">
-                    <p class="text-[11px] text-slate-500 uppercase font-bold">Meta do Dia</p>
-                    <p id="dash-meta" class="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">1.008</p>
-                    <span id="dash-faltando" class="text-xs text-slate-600 block">Faltando: 1.008 pares</span>
-                </div>
-                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200">
-                    <p class="text-[11px] text-slate-500 uppercase font-bold">Produção Realizada</p>
-                    <p id="dash-realizado" class="text-xl sm:text-2xl font-black text-blue-600 mt-0.5">0</p>
-                    <span id="dash-concluido" class="text-xs text-emerald-600 block">0.0% concluído</span>
-                </div>
-                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 cursor-pointer hover:border-blue-300 transition" onclick="mudarAba('eficiencia')">
-                    <p class="text-[11px] text-slate-500 uppercase font-bold">Eficiência Projetada ↗</p>
-                    <p id="dash-eficiencia" class="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">0.0%</p>
-                    <span id="dash-pessoas-ativas" class="text-xs text-slate-600 block">13 pessoas ativas</span>
-                </div>
-                <div id="dash-card-status" class="bg-emerald-50 p-3.5 rounded-xl card-shadow border border-emerald-200">
-                    <p class="text-[11px] text-slate-600 uppercase font-bold">Saldo / Situação</p>
-                    <p id="dash-saldo" class="text-xl sm:text-2xl font-black text-emerald-700 mt-0.5">0</p>
-                    <span id="dash-status-txt" class="text-xs font-bold text-emerald-700 block">ESTA BOM !</span>
-                </div>
-            </section>
-        </div>
-
-        <div class="flex items-center gap-2.5">
-            <div id="banner-motivacional" class="flex-grow bg-slate-900 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow whitespace-pre-line border border-slate-800">
-                MOTIVE A SUA EQUIPE PRA ALCANÇARMOS O OBJETIVO DE HOJE!!!
-            </div>
-            <button id="btn-toggle-dash" onclick="toggleDashboard()" class="bg-white hover:bg-slate-50 text-slate-700 px-3 py-2.5 rounded-xl font-bold text-xs shrink-0 card-shadow border border-slate-200 transition flex items-center gap-1">
-                👁️ <span class="hidden sm:inline">Ocultar</span>
-            </button>
-        </div>
-
+    <!-- ABA 1: QUADRO HORA-HORA (PLANILHA EM CIMA + DASHBOARD EMBAIXO) -->
+    <main id="aba-horahora" class="flex-grow max-w-[1440px] mx-auto p-3 sm:p-4 w-full space-y-4">
+        
+        <!-- 1. PLANILHA HORA-HORA NO TOPO -->
         <section class="bg-white rounded-xl card-shadow border border-slate-200 overflow-hidden">
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto relative">
                 <table class="w-full border-collapse text-xs">
                     <thead>
                         <tr class="bg-slate-900 text-white font-bold" id="header-divisores"></tr>
@@ -195,6 +179,7 @@
             </div>
         </section>
 
+        <!-- LEGENDA SEMÁFORO -->
         <div class="flex flex-wrap items-center justify-between text-xs text-slate-600 px-1 gap-2 font-medium">
             <div class="flex flex-wrap items-center gap-3">
                 <span class="text-slate-900 font-bold">Semáforo Máq.:</span>
@@ -202,7 +187,70 @@
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-amber-400 inline-block"></span> Amarelo (Até -3 pares)</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-red-600 inline-block"></span> Vermelho (< -3 pares)</span>
             </div>
-            <span class="text-slate-500">Linha de Produção</span>
+            <span class="text-slate-500">Deslize a tabela para os lados ⇄</span>
+        </div>
+
+        <!-- BANNER MOTIVACIONAL / META BATIDA -->
+        <div class="flex items-center gap-2.5">
+            <div id="banner-motivacional" class="flex-grow bg-slate-900 text-white text-center py-3 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow whitespace-pre-line border border-slate-800">
+                MOTIVE A SUA EQUIPE PRA ALCANÇARMOS O OBJETIVO DE HOJE!!!
+            </div>
+            <button id="btn-toggle-dash" onclick="toggleDashboard()" class="bg-white hover:bg-slate-50 text-slate-700 px-3 py-3 rounded-xl font-bold text-xs shrink-0 card-shadow border border-slate-200 transition flex items-center gap-1">
+                👁️ <span class="hidden sm:inline">Ocultar</span>
+            </button>
+        </div>
+
+        <!-- 2. DASHBOARD & CONFIGURAÇÕES EMBAIXO DA PLANILHA -->
+        <div id="painel-recolhivel-completo" class="space-y-3 transition-all">
+            <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 text-center">
+                    <p class="text-xs text-slate-500 uppercase font-bold">Meta do Dia</p>
+                    <p id="dash-meta" class="text-2xl sm:text-3xl font-black text-slate-900 mt-0.5">1.008</p>
+                    <span id="dash-faltando" class="text-xs text-slate-600 block font-semibold">Faltando: 1.008 pares</span>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 text-center">
+                    <p class="text-xs text-slate-500 uppercase font-bold">Produção Realizada</p>
+                    <p id="dash-realizado" class="text-2xl sm:text-3xl font-black text-blue-600 mt-0.5">0</p>
+                    <span id="dash-concluido" class="text-xs text-emerald-600 block font-semibold">0.0% concluído</span>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 cursor-pointer hover:border-blue-300 transition text-center" onclick="mudarAba('eficiencia')">
+                    <p class="text-xs text-slate-500 uppercase font-bold">Eficiência Projetada ↗</p>
+                    <p id="dash-eficiencia" class="text-2xl sm:text-3xl font-black text-emerald-600 mt-0.5">0.0%</p>
+                    <span id="dash-pessoas-ativas" class="text-xs text-slate-600 block font-semibold">13 pessoas ativas</span>
+                </div>
+                <div id="dash-card-status" class="bg-emerald-50 p-3.5 rounded-xl card-shadow border border-emerald-200 text-center">
+                    <p class="text-xs text-slate-600 uppercase font-bold">Saldo / Situação</p>
+                    <p id="dash-saldo" class="text-2xl sm:text-3xl font-black text-emerald-700 mt-0.5">0</p>
+                    <span id="dash-status-txt" class="text-xs font-black text-emerald-700 block">ESTA BOM !</span>
+                </div>
+            </section>
+
+            <section class="bg-white p-3.5 rounded-xl card-shadow border border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 items-end">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase">Linha / Líder</label>
+                    <input type="text" id="cfg-linha" value="LINHA - 06" onchange="recalcularTudo()" class="w-full mt-1 px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold text-xs">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase">M. Obra (Sinc.)</label>
+                    <input type="number" id="cfg-mobra" value="13" min="1" oninput="sincronizarMobraMain()" class="w-full mt-1 px-2.5 py-2 bg-emerald-50 border border-emerald-300 rounded-lg font-bold text-sm text-center text-emerald-900">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-emerald-700 uppercase">Qtd. Máquinas</label>
+                    <input type="number" id="cfg-qmaq" value="4" min="1" max="20" oninput="ajustarQtdMaquinas(this.value)" class="w-full mt-1 px-2.5 py-2 bg-emerald-50 border border-emerald-400 rounded-lg font-bold text-sm text-center text-emerald-900">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-amber-700 uppercase">Meta / Hora (Máq.)</label>
+                    <input type="number" id="cfg-mhora" value="36" oninput="recalcularTudo(false, true)" class="w-full mt-1 px-2.5 py-2 bg-amber-50 border border-amber-300 rounded-lg font-bold text-sm text-center text-amber-900">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-500 uppercase">Meta Hora-Hora Linha</label>
+                    <input type="number" id="cfg-metahoralinha" value="144" oninput="recalcularTudo(false, true)" class="w-full mt-1 px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-lg font-bold text-sm text-center text-slate-800">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-blue-700 uppercase">Meta Geral / Total</label>
+                    <input type="number" id="cfg-meta" value="1008" oninput="recalcularTudo(true, false)" class="w-full mt-1 px-2.5 py-2 bg-blue-50 border border-blue-300 rounded-lg font-bold text-sm text-center text-blue-800">
+                </div>
+            </section>
         </div>
     </main>
 
@@ -409,19 +457,21 @@
     </main>
 
     <script>
-        // Registro do Service Worker para instalação PWA verdadeira
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(() => console.log('Service Worker Registrado com sucesso!'))
-                    .catch(err => console.log('Erro ao registrar Service Worker:', err));
+                navigator.serviceWorker.register('sw.js').catch(() => {});
             });
+        }
+
+        function mostrarAviso(msg) {
+            document.getElementById('modal-aviso-texto').innerText = msg;
+            document.getElementById('modal-aviso').classList.remove('hidden');
         }
 
         let bancoTempos = JSON.parse(localStorage.getItem('app_tempos_db')) || {};
         const HORARIOS_PADRAO = ['06:00', '07:10', '08:10', '09:10', '11:20', '12:20', '13:20'];
 
-        let estado = JSON.parse(localStorage.getItem('app_estado_v11')) || {
+        let estado = JSON.parse(localStorage.getItem('app_estado_v12')) || {
             linha: 'LINHA - 06',
             mobra: 13,
             qtdMaquinas: 4,
@@ -429,6 +479,7 @@
             metaHoraLinha: 144,
             metaManual: 1008,
             dashboardOculto: false,
+            metaJaComemorada: false,
             modelos: [
                 { nome: '', vol: 0 },
                 { nome: '', vol: 0 },
@@ -445,6 +496,37 @@
 
         let graficoOperadoresInstance = null;
         document.getElementById('data-turno').valueAsDate = new Date();
+
+        function dispararConfeteMetaBatida(totalRealizado) {
+            document.getElementById('modal-meta-valor').innerText = `${totalRealizado.toLocaleString('pt-BR')} pares`;
+            document.getElementById('modal-meta-batida').classList.remove('hidden');
+
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 120,
+                    spread: 80,
+                    origin: { y: 0.6 }
+                });
+                setTimeout(() => {
+                    confetti({
+                        particleCount: 80,
+                        angle: 60,
+                        spread: 60,
+                        origin: { x: 0 }
+                    });
+                    confetti({
+                        particleCount: 80,
+                        angle: 120,
+                        spread: 60,
+                        origin: { x: 1 }
+                    });
+                }, 350);
+            }
+        }
+
+        function fecharModalMetaBatida() {
+            document.getElementById('modal-meta-batida').classList.add('hidden');
+        }
 
         function verificarTemposVazios() {
             const aviso = document.getElementById('aviso-sem-tempos');
@@ -478,7 +560,7 @@
                 painel.classList.remove('hidden');
                 btn.innerHTML = '👁️ <span class="hidden sm:inline">Ocultar</span>';
             }
-            localStorage.setItem('app_estado_v11', JSON.stringify(estado));
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
         }
 
         function buscarTempoModelo(nome) {
@@ -521,6 +603,30 @@
         function alterarDivisor(maqIdx, val) {
             estado.divisores[maqIdx] = parseInt(val) || 1;
             recalcularTudo(false, true);
+        }
+
+        function aoDigitarRegistro(inputEl, linhaIdx, maqIdx) {
+            const valor = inputEl.value.replace(/\D/g, '');
+            if (valor.length >= 2) {
+                const doisDigitos = valor.slice(0, 2);
+                inputEl.value = doisDigitos;
+                const valNum = parseFloat(doisDigitos);
+                estado.linhas[linhaIdx].registros[maqIdx] = isNaN(valNum) ? null : valNum;
+                recalcularTudo(false, true);
+
+                // Pular automaticamente para o próximo campo (próxima máquina da mesma hora, ou próxima hora)
+                let proxLinha = linhaIdx;
+                let proxMaq = maqIdx + 1;
+                if (proxMaq >= estado.qtdMaquinas) {
+                    proxMaq = 0;
+                    proxLinha = linhaIdx + 1;
+                }
+                const proxInput = document.querySelector(`.input-registro-hora[data-linha="${proxLinha}"][data-maq="${proxMaq}"]`);
+                if (proxInput) {
+                    proxInput.focus();
+                    proxInput.select();
+                }
+            }
         }
 
         function atualizarRegistro(linhaIdx, maqIdx, valStr) {
@@ -599,7 +705,7 @@
                     <tr>
                         <td class="p-2 font-semibold text-slate-600">MOD. ${i + 1}</td>
                         <td class="p-2 font-bold text-slate-900 uppercase">${mod.nome || '-'}</td>
-                        <td class="p-2 text-center font-mono">${tempoUnit > 0 ? tempoUnit.toFixed(3) : '<span class="text-red-500 font-semibold">Não cadastrado</span>'}</td>
+                        <td class="p-2 text-center font-mono">${tempoUnit > 0 ? tempoUnit.toFixed(3) : '<span class="text-red-500 font-semibold">Not found</span>'}</td>
                         <td class="p-2 text-center font-bold text-blue-700">${mod.vol}</td>
                         <td class="p-2 text-center font-semibold text-slate-800">${minGerados.toFixed(1)} min</td>
                         <td class="p-2 text-center font-bold bg-amber-50 text-amber-900">${paresPara80 > 0 ? paresPara80 + ' pares' : '-'}</td>
@@ -635,36 +741,57 @@
             }
 
             renderizarTabelaHoraHora(eficienciaProl, pessoasAtivas);
-            localStorage.setItem('app_estado_v11', JSON.stringify(estado));
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
         }
 
         function renderizarTabelaHoraHora(eficienciaProl, pessoasAtivas) {
             const qMaq = estado.qtdMaquinas;
-            let htmlDiv = `<th class="p-2.5 border-r border-slate-700 text-left">DIVISOR</th>`;
+            
+            // Linha 1 do Cabeçalho: Identificação clara Maq 1, Maq 2... + Divisor + Nomes dos 2 Operadores da Máquina
+            let htmlDiv = `<th class="p-3 border-r border-slate-700 text-left sticky-col-hora bg-slate-900 sticky-shadow min-w-[74px] text-base font-black">HORA</th>`;
             for (let m = 0; m < qMaq; m++) {
+                const ops = estado.operadoresMaquinas[m + 1] || { op1: '', op2: '' };
+                const nomesOps = [ops.op1, ops.op2].filter(n => n && n.trim() !== '').join(' / ') || 'Sem operadores';
                 htmlDiv += `
-                    <th colspan="2" class="p-2 border-r border-slate-700 text-center bg-slate-900">
-                        <div class="inline-flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                            <span class="text-[11px] text-slate-300 font-semibold">Div:</span>
-                            <select onchange="alterarDivisor(${m}, this.value)" class="bg-amber-400 text-slate-950 font-bold text-xs px-1.5 py-0.5 rounded cursor-pointer">
-                                <option value="2" ${estado.divisores[m] === 2 ? 'selected' : ''}>2</option>
-                                <option value="1" ${estado.divisores[m] === 1 ? 'selected' : ''}>1</option>
-                            </select>
+                    <th colspan="2" class="p-3 border-r-2 border-slate-700 text-center bg-slate-900">
+                        <div class="flex flex-col items-center justify-center gap-1">
+                            <div class="flex items-center justify-center gap-2">
+                                <span class="text-sm font-black text-emerald-400 tracking-wide uppercase">Maq ${m + 1}</span>
+                                <div class="inline-flex items-center gap-1 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                                    <span class="text-xs text-slate-300 font-medium">Div:</span>
+                                    <select onchange="alterarDivisor(${m}, this.value)" class="bg-amber-400 text-slate-950 font-bold text-xs px-1.5 py-0.5 rounded cursor-pointer">
+                                        <option value="2" ${estado.divisores[m] === 2 ? 'selected' : ''}>2</option>
+                                        <option value="1" ${estado.divisores[m] === 1 ? 'selected' : ''}>1</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="text-xs font-bold text-sky-300 tracking-wide truncate max-w-[210px]" title="${nomesOps}">
+                                👷 ${nomesOps}
+                            </div>
                         </div>
                     </th>
                 `;
             }
-            htmlDiv += `<th class="p-2 border-r border-slate-700 text-center text-slate-200">META/H</th><th class="p-2 text-center text-slate-200">SALDO</th>`;
+            htmlDiv += `
+                <th class="p-3 border-r border-slate-700 text-center text-slate-200 min-w-[95px]">
+                    <div class="flex flex-col items-center justify-center">
+                        <span class="text-xs font-bold">META/H</span>
+                        <span class="text-sm text-blue-300 font-mono font-black">${estado.metaHoraLinha}p</span>
+                    </div>
+                </th>
+                <th class="p-3 text-center text-slate-200 min-w-[85px] text-xs font-bold">SALDO</th>
+            `;
             document.getElementById('header-divisores').innerHTML = htmlDiv;
 
-            let htmlCol = `<th class="p-2.5 border-r border-slate-300 text-left w-24">HORA</th>`;
+            // Linha 2 do Cabeçalho: Campos mais largos na horizontal
+            let htmlCol = `<th class="p-2 border-r border-slate-300 text-left sticky-col-hora bg-slate-200 sticky-shadow min-w-[74px]">TURNO</th>`;
             for (let m = 0; m < qMaq; m++) {
                 htmlCol += `
-                    <th class="p-2 border-r border-slate-300 text-center bg-slate-100 text-slate-700 min-w-[75px]">REGISTRO</th>
-                    <th class="p-2 border-r-2 border-slate-300 text-center bg-slate-200 text-slate-900 min-w-[75px]">MAQ. ${m + 1}</th>
+                    <th class="p-2 border-r border-slate-300 text-center bg-slate-100 text-slate-700 min-w-[115px]">REGISTRO</th>
+                    <th class="p-2 border-r-2 border-slate-300 text-center bg-slate-200 text-slate-900 min-w-[90px]">MAQ ${m + 1}</th>
                 `;
             }
-            htmlCol += `<th class="p-2 border-r border-slate-300 text-center bg-blue-50 text-blue-900 min-w-[85px]">HORA-HORA</th><th class="p-2 text-center bg-slate-200 text-slate-900 min-w-[85px]">DIFERENÇA</th>`;
+            htmlCol += `<th class="p-2 border-r border-slate-300 text-center bg-blue-50 text-blue-900 min-w-[90px]">HORA-HORA</th><th class="p-2 text-center bg-slate-200 text-slate-900 min-w-[90px]">DIFERENÇA</th>`;
             document.getElementById('header-colunas').innerHTML = htmlCol;
 
             const tbody = document.getElementById('corpo-tabela');
@@ -678,7 +805,7 @@
             estado.linhas.forEach((linha, lIdx) => {
                 let somaLinha = 0;
                 let temAlgum = false;
-                let rowHtml = `<td class="p-2.5 border-r border-slate-200 font-bold text-slate-800 bg-slate-50">${linha.hora}</td>`;
+                let rowHtml = `<td class="p-2.5 border-r border-slate-300 font-black text-slate-900 bg-slate-100 sticky-col-hora sticky-shadow min-w-[74px]">${linha.hora}</td>`;
 
                 for (let m = 0; m < qMaq; m++) {
                     const reg = linha.registros[m];
@@ -695,11 +822,13 @@
 
                     const corSem = obterClasseSemaforo(real, temReg);
                     rowHtml += `
-                        <td class="p-1.5 border-r border-slate-200 text-center">
-                            <input type="number" value="${temReg ? reg : ''}" placeholder="0" onchange="atualizarRegistro(${lIdx}, ${m}, this.value)"
-                                   class="w-full text-center py-1.5 px-1 rounded border border-slate-300 focus:border-blue-500 focus:outline-none font-bold text-slate-900 bg-white text-xs">
+                        <td class="p-1.5 border-r border-slate-200 text-center min-w-[115px]">
+                            <input type="number" inputmode="numeric" data-linha="${lIdx}" data-maq="${m}" value="${temReg ? reg : ''}" placeholder="0"
+                                   oninput="aoDigitarRegistro(this, ${lIdx}, ${m})"
+                                   onchange="atualizarRegistro(${lIdx}, ${m}, this.value)"
+                                   class="input-registro-hora w-full text-center py-2 px-2 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none font-bold text-slate-900 bg-white text-base font-black">
                         </td>
-                        <td class="p-2 border-r-2 border-slate-300 text-center text-xs ${corSem}">
+                        <td class="p-2 border-r-2 border-slate-300 text-center text-sm font-black min-w-[90px] ${corSem}">
                             ${temReg ? (Number.isInteger(real) ? real : real.toFixed(1)) : '-'}
                         </td>
                     `;
@@ -710,7 +839,7 @@
                 if (temAlgum) saldoAcumulado += dif;
 
                 rowHtml += `
-                    <td class="p-2.5 border-r border-slate-200 text-center font-bold text-blue-700 bg-blue-50/50 text-sm">${temAlgum ? somaLinha : '-'}</td>
+                    <td class="p-2.5 border-r border-slate-200 text-center font-bold text-blue-700 bg-blue-50/50 text-base font-black">${temAlgum ? somaLinha : '-'}</td>
                     <td class="p-2.5 text-center text-xs ${!temAlgum ? 'text-slate-400' : (dif >= 0 ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold')}">
                         ${temAlgum ? (dif > 0 ? '+' + dif : dif) : '-'}
                     </td>
@@ -718,7 +847,7 @@
                 tbody.innerHTML += `<tr class="hover:bg-slate-50/80 transition">${rowHtml}</tr>`;
             });
 
-            let footHtml = `<td class="p-2.5 border-r border-slate-300 text-left uppercase font-bold">TOTAL</td>`;
+            let footHtml = `<td class="p-2.5 border-r border-slate-300 text-left uppercase font-black sticky-col-hora bg-slate-200 sticky-shadow min-w-[74px]">TOTAL</td>`;
             for (let m = 0; m < qMaq; m++) {
                 footHtml += `
                     <td class="p-2 border-r border-slate-300 text-center text-slate-600 font-semibold">${somaMaqBruta[m]}</td>
@@ -727,7 +856,6 @@
             }
             footHtml += `
                 <td class="p-2 border-r border-slate-300 text-center text-blue-900 bg-blue-100/70 font-bold">${totalRealizado}</td>
-                <td class="p-2 border-r border-slate-300 text-center font-bold text-amber-900 bg-amber-50" title="Meta Hora da Linha">🎯 ${estado.metaHoraLinha}</td>
                 <td class="p-2 text-center font-bold ${saldoAcumulado >= 0 ? 'text-emerald-800' : 'text-red-800'}">${saldoAcumulado > 0 ? '+' + saldoAcumulado : saldoAcumulado}</td>
             `;
             document.getElementById('rodape-tabela').innerHTML = footHtml;
@@ -737,7 +865,7 @@
             const pctConcluido = ((totalRealizado / meta) * 100).toFixed(1);
 
             document.getElementById('dash-meta').innerText = meta.toLocaleString('pt-BR');
-            document.getElementById('dash-faltando').innerText = faltando === 0 ? 'Meta concluída!' : `Faltando: ${faltando} pares`;
+            document.getElementById('dash-faltando').innerText = faltando === 0 ? 'META BATIDA! 🎉' : `Faltando: ${faltando} pares`;
             document.getElementById('dash-realizado').innerText = totalRealizado.toLocaleString('pt-BR');
             document.getElementById('dash-concluido').innerText = `${pctConcluido}% concluído`;
             document.getElementById('dash-eficiencia').innerText = `${eficienciaProl.toFixed(1)}%`;
@@ -748,7 +876,12 @@
             const cardStatus = document.getElementById('dash-card-status');
             elSaldo.innerText = saldoAcumulado > 0 ? `+${saldoAcumulado}` : saldoAcumulado;
 
-            if (saldoAcumulado < -11) {
+            if (totalRealizado >= meta && meta > 0) {
+                cardStatus.className = 'bg-emerald-100 p-3.5 rounded-xl card-shadow border-2 border-emerald-500';
+                elSaldo.className = 'text-xl sm:text-2xl font-black text-emerald-700 mt-0.5';
+                elStatus.className = 'text-xs font-black text-emerald-800 block';
+                elStatus.innerText = '🏆 META BATIDA!';
+            } else if (saldoAcumulado < -11) {
                 cardStatus.className = 'bg-red-50 p-3.5 rounded-xl card-shadow border border-red-200';
                 elSaldo.className = 'text-xl sm:text-2xl font-black text-red-700 mt-0.5';
                 elStatus.className = 'text-xs font-bold text-red-700 block';
@@ -766,22 +899,31 @@
             }
 
             const banner = document.getElementById('banner-motivacional');
-            if (totalRealizado >= meta) {
-                banner.className = 'flex-grow bg-emerald-700 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow border border-emerald-600';
-                banner.innerText = 'PARABENIZE SUA EQUIPE, PELO RESULTADO ALCANÇADO!!!';
-            } else if (totalRealizado >= meta - 100) {
-                banner.className = 'flex-grow bg-blue-800 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow border border-blue-700';
-                banner.innerText = 'PARABENIZE SUA EQUIPE, CHEGAMOS PERTO DO NOSSO OBJETIVO!!!';
+            if (totalRealizado >= meta && meta > 0) {
+                banner.className = 'flex-grow bg-emerald-600 text-white text-center py-3 px-3 rounded-xl font-black text-sm sm:text-base tracking-wider card-shadow border-2 border-emerald-400 animate-pulse';
+                banner.innerText = '🎉 META BATIDA! PARABÉNS EQUIPE! 🏆';
+                
+                if (!estado.metaJaComemorada) {
+                    estado.metaJaComemorada = true;
+                    dispararConfeteMetaBatida(totalRealizado);
+                }
             } else {
-                banner.className = 'flex-grow bg-slate-900 text-white text-center py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow border border-slate-800';
-                banner.innerText = 'MOTIVE A SUA EQUIPE PRA ALCANÇARMOS O OBJETIVO DE HOJE!!!';
+                estado.metaJaComemorada = false;
+                if (totalRealizado >= meta - 100 && meta > 100) {
+                    banner.className = 'flex-grow bg-blue-800 text-white text-center py-3 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow border border-blue-700';
+                    banner.innerText = 'PARABENIZE SUA EQUIPE, CHEGAMOS PERTO DO NOSSO OBJETIVO!!!';
+                } else {
+                    banner.className = 'flex-grow bg-slate-900 text-white text-center py-3 px-3 rounded-xl font-bold text-xs sm:text-sm tracking-wide card-shadow border border-slate-800';
+                    banner.innerText = 'MOTIVE A SUA EQUIPE PRA ALCANÇARMOS O OBJETIVO DE HOJE!!!';
+                }
             }
         }
 
         function zerarTurno() {
-            if (!confirm('Zerar todos os lançamentos das máquinas deste turno?')) return;
             estado.linhas.forEach(l => l.registros = Array(estado.qtdMaquinas).fill(null));
+            estado.metaJaComemorada = false;
             recalcularTudo(false, true);
+            mostrarAviso('Lançamentos do turno zerados!');
         }
 
         // --- ABA DE OPERADORES & DESEMPENHO ---
@@ -798,14 +940,14 @@
                     estado.operadoresMaquinas[m] = { op1: '', op2: '' };
                 }
                 const ops = estado.operadoresMaquinas[m];
-                const nomeDupla = (ops.op1 || ops.op2) ? `Máq. ${m} (${ops.op1} & ${ops.op2})` : `Máquina ${m}`;
+                const nomeDupla = (ops.op1 || ops.op2) ? `Maq ${m} (${ops.op1} & ${ops.op2})` : `Maq ${m}`;
                 
                 selectMaq.innerHTML += `<option value="${m}" ${valorSelecionado == m ? 'selected' : ''}>${nomeDupla}</option>`;
 
                 container.innerHTML += `
                     <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
                         <div class="flex justify-between items-center">
-                            <span class="font-bold text-slate-900 text-xs sm:text-sm">Máquina ${m}</span>
+                            <span class="font-bold text-slate-900 text-xs sm:text-base font-black">Maq ${m}</span>
                             <span class="text-[11px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">2 Operadores</span>
                         </div>
                         <div class="space-y-2 text-xs">
@@ -830,14 +972,15 @@
             selectMaq.innerHTML = '<option value="todas">Todas as Máquinas (Geral)</option>';
             for (let m = 1; m <= estado.qtdMaquinas; m++) {
                 const ops = estado.operadoresMaquinas[m] || { op1: '', op2: '' };
-                const nomeDupla = (ops.op1 || ops.op2) ? `Máq. ${m} (${ops.op1} & ${ops.op2})` : `Máquina ${m}`;
+                const nomeDupla = (ops.op1 || ops.op2) ? `Maq ${m} (${ops.op1} & ${ops.op2})` : `Maq ${m}`;
                 selectMaq.innerHTML += `<option value="${m}" ${valorAtual == m ? 'selected' : ''}>${nomeDupla}</option>`;
             }
         }
 
         function salvarOperadores() {
-            localStorage.setItem('app_estado_v11', JSON.stringify(estado));
-            alert('Escala de operadores salva com sucesso!');
+            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+            recalcularTudo(false, true);
+            mostrarAviso('Escala de operadores salva com sucesso!');
         }
 
         function renderizarGraficoOperadores() {
@@ -872,7 +1015,7 @@
             }
 
             const opsInfo = filtroMaq !== 'todas' ? estado.operadoresMaquinas[filtroMaq] : null;
-            const nomeLabel = opsInfo && (opsInfo.op1 || opsInfo.op2) ? `Produção (${opsInfo.op1} & ${opsInfo.op2})` : (filtroMaq === 'todas' ? 'Produção Realizada (Linha)' : `Produção Máq. ${filtroMaq}`);
+            const nomeLabel = opsInfo && (opsInfo.op1 || opsInfo.op2) ? `Produção (${opsInfo.op1} & ${opsInfo.op2})` : (filtroMaq === 'todas' ? 'Produção Realizada (Linha)' : `Produção Maq ${filtroMaq}`);
 
             const ctx = document.getElementById('graficoOperadoresMovimento').getContext('2d');
             if (graficoOperadoresInstance) graficoOperadoresInstance.destroy();
@@ -939,7 +1082,6 @@
                         <td class="p-2.5 text-center text-slate-700">${pares100} p/h</td>
                         <td class="p-2.5 text-center font-bold text-emerald-700">${pares80} p/h</td>
                         <td class="p-2.5 text-right space-x-1.5">
-                            <button onclick="editarModeloTempo('${mod}')" class="text-xs bg-amber-100 hover:bg-amber-200 text-amber-900 px-2.5 py-1 rounded font-semibold transition">Editar</button>
                             <button onclick="removerModeloTempo('${mod}')" class="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-2.5 py-1 rounded font-semibold transition">Excluir</button>
                         </td>
                     </tr>
@@ -950,7 +1092,7 @@
         function adicionarOuAtualizarModelo() {
             const nome = document.getElementById('novo-modelo-nome').value.trim().toUpperCase();
             const tempo = parseFloat(document.getElementById('novo-modelo-tempo').value);
-            if (!nome || isNaN(tempo) || tempo <= 0) return alert('Informe o nome e um tempo válido.');
+            if (!nome || isNaN(tempo) || tempo <= 0) return mostrarAviso('Informe o nome e um tempo válido.');
             bancoTempos[nome] = tempo;
             localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
             document.getElementById('novo-modelo-nome').value = '';
@@ -958,34 +1100,22 @@
             atualizarSelectsModelos();
             renderizarTabelaTempos();
             recalcularTudo(false, true);
-            alert(`Modelo ${nome} salvo com sucesso!`);
-        }
-
-        function editarModeloTempo(nome) {
-            const novoTempo = prompt(`Editar tempo padrão (min) para o modelo ${nome}:`, bancoTempos[nome]);
-            if (novoTempo === null) return;
-            const t = parseFloat(novoTempo);
-            if (isNaN(t) || t <= 0) return alert('Valor inválido.');
-            bancoTempos[nome] = t;
-            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
-            atualizarSelectsModelos();
-            renderizarTabelaTempos();
-            recalcularTudo(false, true);
+            mostrarAviso(`Modelo ${nome} salvo com sucesso!`);
         }
 
         function removerModeloTempo(nome) {
-            if (!confirm(`Remover o modelo ${nome}?`)) return;
             delete bancoTempos[nome];
             localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
             atualizarSelectsModelos();
             renderizarTabelaTempos();
             recalcularTudo(false, true);
+            mostrarAviso(`Modelo ${nome} removido.`);
         }
 
         // --- HISTÓRICO & BACKUP GERAL DO CELULAR ---
         function salvarTurnoHistorico() {
             const dataStr = document.getElementById('data-turno').value;
-            if (!dataStr) return alert('Selecione uma data.');
+            if (!dataStr) return mostrarAviso('Selecione uma data.');
 
             let totalReal = 0, saldo = 0;
             estado.linhas.forEach(l => {
@@ -1002,20 +1132,20 @@
             const efTxt = document.getElementById('ef-card-prol').innerText;
             const modelosUsados = estado.modelos.filter(m => m.vol > 0).map(m => `${m.nome} (${m.vol})`).join(', ') || '-';
 
-            let hist = JSON.parse(localStorage.getItem('app_historico_v11') || '[]');
+            let hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]');
             const id = `${dataStr}_${estado.linha}`;
             const reg = { id, data: dataStr, linha: estado.linha, modelos: modelosUsados, meta: estado.metaManual, realizado: totalReal, ef: efTxt, saldo, snapshot: JSON.parse(JSON.stringify(estado)) };
             
             const idx = hist.findIndex(x => x.id === id);
             if (idx >= 0) hist[idx] = reg; else hist.push(reg);
             hist.sort((a, b) => b.data.localeCompare(a.data));
-            localStorage.setItem('app_historico_v11', JSON.stringify(hist));
-            alert('Turno salvo no histórico com sucesso!');
+            localStorage.setItem('app_historico_v12', JSON.stringify(hist));
+            mostrarAviso('Turno salvo no histórico com sucesso!');
         }
 
         function renderizarHistorico() {
             const filtro = document.getElementById('filtro-periodo').value;
-            let hist = JSON.parse(localStorage.getItem('app_historico_v11') || '[]');
+            let hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]');
             const hoje = new Date();
 
             if (filtro === 'semana') {
@@ -1057,7 +1187,7 @@
         }
 
         function abrirTurnoHistorico(id) {
-            const hist = JSON.parse(localStorage.getItem('app_historico_v11') || '[]');
+            const hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]');
             const item = hist.find(x => x.id === id);
             if (!item || !item.snapshot) return;
             estado = JSON.parse(JSON.stringify(item.snapshot));
@@ -1068,16 +1198,16 @@
         }
 
         function excluirTurnoHistorico(id) {
-            if (!confirm('Excluir este registro?')) return;
-            let hist = JSON.parse(localStorage.getItem('app_historico_v11') || '[]').filter(x => x.id !== id);
-            localStorage.setItem('app_historico_v11', JSON.stringify(hist));
+            let hist = JSON.parse(localStorage.getItem('app_historico_v12') || '[]').filter(x => x.id !== id);
+            localStorage.setItem('app_historico_v12', JSON.stringify(hist));
             renderizarHistorico();
+            mostrarAviso('Registro excluído.');
         }
 
         function exportarBackupGeral() {
             const dadosBackup = {
                 tempos: bancoTempos,
-                historico: JSON.parse(localStorage.getItem('app_historico_v11') || '[]'),
+                historico: JSON.parse(localStorage.getItem('app_historico_v12') || '[]'),
                 estadoAtual: estado
             };
             const blob = new Blob([JSON.stringify(dadosBackup, null, 4)], { type: 'application/json' });
@@ -1102,19 +1232,19 @@
                         localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
                     }
                     if (conteudo.historico) {
-                        localStorage.setItem('app_historico_v11', JSON.stringify(conteudo.historico));
+                        localStorage.setItem('app_historico_v12', JSON.stringify(conteudo.historico));
                     }
                     if (conteudo.estadoAtual) {
                         estado = conteudo.estadoAtual;
-                        localStorage.setItem('app_estado_v11', JSON.stringify(estado));
+                        localStorage.setItem('app_estado_v12', JSON.stringify(estado));
                     }
                     atualizarSelectsModelos();
                     sincronizarCampos();
                     renderizarHistorico();
                     recalcularTudo(false, true);
-                    alert('Arquivo tempos.json carregado com sucesso!');
+                    mostrarAviso('Arquivo JSON carregado com sucesso!');
                 } catch (err) {
-                    alert('Erro ao ler o arquivo JSON. Certifique-se de que é um arquivo válido.');
+                    mostrarAviso('Erro ao ler o arquivo JSON.');
                 }
             };
             reader.readAsText(file);
