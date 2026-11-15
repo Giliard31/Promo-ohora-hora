@@ -60,6 +60,7 @@
         </div>
     </div>
 
+    
     <!-- MODAL EDITAR HORÁRIOS DO TURNO -->
     <div id="modal-editar-horarios" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4">
@@ -67,7 +68,7 @@
                 <h3 class="text-sm font-bold text-slate-900 uppercase">Editar Horas do Turno</h3>
                 <button onclick="fecharModalEditarHorarios()" class="text-slate-400 hover:text-slate-700 text-xs font-bold">✕ Fechar</button>
             </div>
-            <p class="text-xs text-slate-500">Modifique os horários da sua linha (ex: digite <b>ALMOÇO</b> em uma das horas):</p>
+            <p class="text-xs text-slate-500">Modifique os horários da sua linha conforme necessário:</p>
             <div id="lista-inputs-horarios" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
             <div class="flex gap-2 pt-2 border-t">
                 <button onclick="fecharModalEditarHorarios()" class="w-1/2 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">Cancelar</button>
@@ -147,8 +148,15 @@
                 </div>
             </div>
 
-            <div class="pt-2">
-                <button onclick="zerarTurno(); toggleGaveta(false);" class="w-full py-2 px-3 bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-red-200 border border-slate-700 rounded-lg font-semibold text-xs transition">
+            <div class="space-y-2 pt-2 border-t border-slate-800">
+                <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">Backup & Armazenamento</p>
+                <button onclick="salvarBackupGaveta()" class="w-full py-2.5 px-3 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                    💾 Salvar Backup Geral
+                </button>
+                <button onclick="carregarBackupGaveta()" class="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                    📂 Carregar Backup no Sistema
+                </button>
+                <button onclick="zerarTurno(); toggleGaveta(false);" class="w-full py-2 px-3 bg-slate-800 hover:bg-red-900/60 text-slate-300 hover:text-red-200 border border-slate-700 rounded-lg font-semibold text-xs transition mt-2">
                     🔄 Zerar Lançamentos do Turno
                 </button>
             </div>
@@ -479,6 +487,7 @@
             });
         }
 
+        
         function toggleMenuTurno(e) {
             e.stopPropagation();
             const menu = document.getElementById('menu-dropdown-turno');
@@ -527,11 +536,13 @@
         function adicionarHoraTurno() {
             document.getElementById('menu-dropdown-turno').classList.add('hidden');
             
+            // Adicionar nova linha de horário
             estado.linhas.push({
                 hora: 'NOVA',
                 registros: Array(estado.qtdMaquinas).fill(null)
             });
 
+            // Aumentar proporcionalmente o tempo do turno em minutos (ex: +55 minutos por nova hora)
             let tempoAtual = parseFloat(document.getElementById('ef-tempo-turno').value) || 440;
             let novoTempo = tempoAtual + 55;
             document.getElementById('ef-tempo-turno').value = novoTempo;
@@ -549,6 +560,7 @@
             }
             estado.linhas.pop();
 
+            // Diminuir proporcionalmente o tempo do turno em minutos (ex: -55 minutos)
             let tempoAtual = parseFloat(document.getElementById('ef-tempo-turno').value) || 440;
             let novoTempo = Math.max(55, tempoAtual - 55);
             document.getElementById('ef-tempo-turno').value = novoTempo;
@@ -654,6 +666,8 @@
             } else {
                 painel.classList.remove('hidden');
                 btn.innerHTML = '👁️ <span class="hidden sm:inline">Ocultar</span>';
+                // Rolar a tela suavemente para baixo para mostrar o painel que acabou de abrir
+                painel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
             localStorage.setItem('app_estado_v12', JSON.stringify(estado));
         }
@@ -709,6 +723,7 @@
                 estado.linhas[linhaIdx].registros[maqIdx] = isNaN(valNum) ? null : valNum;
                 recalcularTudo(false, true);
 
+                // Pular automaticamente para o próximo campo (próxima máquina da mesma hora, ou próxima hora)
                 let proxLinha = linhaIdx;
                 let proxMaq = maqIdx + 1;
                 if (proxMaq >= estado.qtdMaquinas) {
@@ -765,9 +780,9 @@
                 estado.metaManual = parseFloat(document.getElementById('cfg-meta').value) || 1008;
             }
 
-            const qtdHorarios = estado.linhas.filter(l => !(l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO'))).length || 7;
+            const qtdHorarios = estado.linhas.length || 7;
             if (!metaMaqEditadaManualmente) {
-                const metaLinhaCalc = Math.round(estado.metaManual / (qtdHorarios || 1));
+                const metaLinhaCalc = Math.round(estado.metaManual / qtdHorarios);
                 const metaPorMaqCalc = Math.ceil(metaLinhaCalc / (estado.qtdMaquinas || 1));
                 estado.metaHoraLinha = metaLinhaCalc;
                 estado.metaHoraMaq = metaPorMaqCalc;
@@ -846,6 +861,7 @@
         function renderizarTabelaHoraHora(eficienciaProl, pessoasAtivas) {
             const qMaq = estado.qtdMaquinas;
             
+            // Linha 1 do Cabeçalho: Identificação clara Maq 1, Maq 2... + Divisor + Nomes dos 2 Operadores da Máquina
             let htmlDiv = `<th class="p-3 border-r border-slate-700 text-left sticky-col-hora bg-slate-900 sticky-shadow min-w-[74px] text-base font-black">HORA</th>`;
             for (let m = 0; m < qMaq; m++) {
                 const ops = estado.operadoresMaquinas[m + 1] || { op1: '', op2: '' };
@@ -881,11 +897,13 @@
             `;
             document.getElementById('header-divisores').innerHTML = htmlDiv;
 
+            // Linha 2 do Cabeçalho: Campos mais largos na horizontal
             let htmlCol = `<th class="p-2 border-r border-slate-300 text-left sticky-col-hora bg-slate-200 sticky-shadow min-w-[74px] relative">
                         <button onclick="toggleMenuTurno(event)" class="w-full flex items-center justify-between font-bold text-slate-800 hover:text-blue-600 focus:outline-none">
                             <span>TURNO</span>
                             <span class="text-xs">▾</span>
                         </button>
+                        <!-- MENU DROPDOWN FLUTUANTE -->
                         <div id="menu-dropdown-turno" class="hidden absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 py-1.5 text-xs font-semibold text-slate-700">
                             <button onclick="abrirModalEditarHorarios()" class="w-full text-left px-4 py-2 hover:bg-slate-100 flex items-center gap-2">
                                 <span>✏️</span> Editar Horas
@@ -967,7 +985,7 @@
 
                     rowHtml += `
                         <td class="p-2.5 border-r border-slate-200 text-center font-bold text-blue-700 bg-blue-50/50 text-base font-black">${temAlgum ? somaLinha : '-'}</td>
-                        <td class="p-2.5 text-center text-xs ${!temAlgum ? 'text-slate-400' : (dif >= 0 ? 'text-emerald-700 font-bold' : 'text-red-700 font-bold')}">
+                        <td class="p-2.5 text-center text-base sm:text-lg font-black ${!temAlgum ? 'text-slate-400' : (dif >= 0 ? 'text-emerald-700 font-black' : 'text-red-700 font-black')}">
                             ${temAlgum ? (dif > 0 ? '+' + dif : dif) : '-'}
                         </td>
                     `;
@@ -1120,7 +1138,6 @@
 
             if (filtroMaq === 'todas') {
                 datasetProducao = estado.linhas.map(l => {
-                    if (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) return 0;
                     let soma = 0;
                     for (let m = 0; m < estado.qtdMaquinas; m++) {
                         const reg = l.registros[m];
@@ -1130,18 +1147,17 @@
                     }
                     return soma;
                 });
-                datasetMeta = estado.linhas.map(l => (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) ? 0 : estado.metaHoraLinha);
+                datasetMeta = estado.linhas.map(() => estado.metaHoraLinha);
             } else {
                 const mIdx = parseInt(filtroMaq) - 1;
                 datasetProducao = estado.linhas.map(l => {
-                    if (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) return 0;
                     const reg = l.registros[mIdx];
                     if (reg !== null && reg !== undefined && reg !== '') {
                         return reg / (estado.divisores[mIdx] || 1);
                     }
                     return 0;
                 });
-                datasetMeta = estado.linhas.map(l => (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) ? 0 : estado.metaHoraMaq);
+                datasetMeta = estado.linhas.map(() => estado.metaHoraMaq);
             }
 
             const opsInfo = filtroMaq !== 'todas' ? estado.operadoresMaquinas[filtroMaq] : null;
@@ -1249,7 +1265,6 @@
 
             let totalReal = 0, saldo = 0;
             estado.linhas.forEach(l => {
-                if (l.hora.toUpperCase().includes('ALMOÇO') || l.hora.toUpperCase().includes('ALMOCO')) return;
                 let s = 0, tem = false;
                 for (let m = 0; m < estado.qtdMaquinas; m++) {
                     if (l.registros[m] !== null && l.registros[m] !== undefined) {
@@ -1333,6 +1348,88 @@
             localStorage.setItem('app_historico_v12', JSON.stringify(hist));
             renderizarHistorico();
             mostrarAviso('Registro excluído.');
+        }
+
+        
+        async function salvarBackupGaveta() {
+            toggleGaveta(false);
+            const dadosBackup = {
+                tempos: bancoTempos,
+                historico: JSON.parse(localStorage.getItem('app_historico_v12') || '[]'),
+                estadoAtual: estado
+            };
+            const jsonStr = JSON.stringify(dadosBackup, null, 4);
+            const nomeArquivo = `backup_completo_${new Date().toISOString().slice(0,10)}.json`;
+
+            if (window.showSaveFilePicker) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: nomeArquivo,
+                        types: [{
+                            description: 'Arquivo JSON',
+                            accept: { 'application/json': ['.json'] }
+                        }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(jsonStr);
+                    await writable.close();
+                    mostrarAviso('Backup salvo com sucesso na pasta selecionada!');
+                    return;
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.log('File picker falhou, usando download padrão:', err);
+                    } else {
+                        return;
+                    }
+                }
+            }
+
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = nomeArquivo;
+            a.click();
+            mostrarAviso('Backup salvo na pasta de downloads do celular!');
+        }
+
+        function carregarBackupGaveta() {
+            toggleGaveta(false);
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    try {
+                        const conteudo = JSON.parse(ev.target.result);
+                        if (conteudo.tempos) {
+                            bancoTempos = conteudo.tempos;
+                            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+                        } else if (typeof conteudo === 'object' && !conteudo.historico && !conteudo.estadoAtual) {
+                            bancoTempos = conteudo;
+                            localStorage.setItem('app_tempos_db', JSON.stringify(bancoTempos));
+                        }
+                        if (conteudo.historico) {
+                            localStorage.setItem('app_historico_v12', JSON.stringify(conteudo.historico));
+                        }
+                        if (conteudo.estadoAtual) {
+                            estado = conteudo.estadoAtual;
+                            localStorage.setItem('app_estado_v12', JSON.stringify(estado));
+                        }
+                        atualizarSelectsModelos();
+                        sincronizarCampos();
+                        renderizarHistorico();
+                        recalcularTudo(false, true);
+                        mostrarAviso('Backup carregado com sucesso no sistema!');
+                    } catch (err) {
+                        mostrarAviso('Erro ao ler o arquivo JSON de backup.');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         }
 
         function exportarBackupGeral() {
@@ -1430,7 +1527,7 @@
             }
         }
 
-        // Inicialização
+        // Initialization
         atualizarSelectsModelos();
         sincronizarCampos();
         recalcularTudo(false, false);
